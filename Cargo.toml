@@ -2,8 +2,8 @@
 name = "void"
 version = "0.1.0"
 edition = "2021"
-description = "Enter the void, survive if you can"
-authors = ["Your Name <your.email@example.com>"]
+description = "Enter the void..."
+authors = ["Shaya Arya>"]
 
 [dependencies]
 # Core Bevy engine

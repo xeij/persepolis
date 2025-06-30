@@ -1,6 +1,6 @@
 @echo off
 echo =================================
-echo   Hyper Undead Setup Script
+echo   Void Setup Script
 echo =================================
 echo.
 
@@ -131,13 +131,13 @@ echo Building release version...
 cargo build --release
 echo.
 echo Running release version...
-target\release\hyper_undead.exe
+target\release\void.exe
 goto :end
 
 :release_run_built
 echo.
 echo Running release version...
-target\release\hyper_undead.exe
+target\release\void.exe
 goto :end
 
 :build_only
