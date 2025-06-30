@@ -1,0 +1,74 @@
+[package]
+name = "void"
+version = "0.1.0"
+edition = "2021"
+description = "Enter the void, survive if you can"
+authors = ["Your Name <your.email@example.com>"]
+
+[dependencies]
+# Core Bevy engine
+bevy = { version = "0.14", default-features = false, features = [
+    "bevy_winit",
+    "bevy_render",
+    "bevy_core_pipeline", 
+    "bevy_pbr",
+    "bevy_asset",
+    "bevy_scene",
+    "bevy_ui",
+    "bevy_text",
+    "bevy_audio",
+    "bevy_gilrs",
+    "bevy_state",
+    "png",
+    "vorbis",
+    "x11",
+    "file_watcher",
+    "multi_threaded",
+]}
+
+# Math and utilities
+glam = "0.27"
+rand = "0.8"
+noise = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+
+# Audio
+bevy_kira_audio = "0.20"
+
+# Enhanced graphics  
+bevy_atmosphere = "0.9"
+
+# Input handling
+leafwing-input-manager = "0.13"
+
+# Performance and diagnostics
+bevy-inspector-egui = { version = "0.25", optional = true }
+iyes_perf_ui = "0.3"
+
+# Networking for Steam integration (future)
+bevy_renet = "0.0.12"
+
+[profile.dev]
+opt-level = 1
+debug = true
+incremental = true
+codegen-units = 256
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+
+# Steam SDK integration (when ready for Steam)
+[features]
+default = ["dev"]
+dev = ["bevy-inspector-egui"]
+steam = [] 
