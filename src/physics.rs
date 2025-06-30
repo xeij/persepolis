@@ -177,11 +177,14 @@ fn apply_physics_movement(
     
     for (mut transform, mut rigidbody) in query.iter_mut() {
         if !rigidbody.is_kinematic {
+            // Store drag value before using mutable borrow
+            let drag = rigidbody.drag;
+            
             // Apply velocity to position
             transform.translation += rigidbody.velocity * dt;
             
             // Apply drag
-            rigidbody.velocity *= rigidbody.drag;
+            rigidbody.velocity *= drag;
             
             // Zero out very small velocities to prevent jitter
             if rigidbody.velocity.length() < 0.01 {

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use rand::Rng;
-use crate::{GameConfig, zombies::ZombieType};
+use crate::zombies::ZombieType;
 
 pub struct ParticlePlugin;
 
@@ -352,7 +352,11 @@ fn update_particles(
             let rainbow_color = get_rainbow_color(color_phase);
             let intensity = (1.0 - life_ratio) * 3.0; // Fade intensity
             
-            material.emissive = (rainbow_color * intensity).into();
+            material.emissive = Color::srgb(
+                rainbow_color.to_srgba().red * intensity,
+                rainbow_color.to_srgba().green * intensity,
+                rainbow_color.to_srgba().blue * intensity,
+            ).into();
             material.base_color = rainbow_color;
         }
     }
@@ -379,8 +383,13 @@ fn update_expanding_rings(
             let alpha = 1.0 - life_ratio;
             let rainbow_color = get_rainbow_color(ring.color_phase);
             
-            material.base_color = Color::srgba(rainbow_color.r, rainbow_color.g, rainbow_color.b, alpha * 0.7);
-            material.emissive = (rainbow_color * (1.0 - life_ratio) * 2.0).into();
+            let srgba = rainbow_color.to_srgba();
+            material.base_color = Color::srgba(srgba.red, srgba.green, srgba.blue, alpha * 0.7);
+            material.emissive = Color::srgb(
+                srgba.red * (1.0 - life_ratio) * 2.0,
+                srgba.green * (1.0 - life_ratio) * 2.0,
+                srgba.blue * (1.0 - life_ratio) * 2.0,
+            ).into();
         }
     }
 }
@@ -400,10 +409,12 @@ fn update_screen_flash(
         let intensity = flash.intensity * (1.0 - life_ratio * life_ratio); // Quadratic falloff
         
         total_flash_intensity += intensity;
+        let flash_srgba = flash_color.to_srgba();
+        let flash_flash_srgba = flash.flash_color.to_srgba();
         flash_color = Color::srgb(
-            flash_color.r + flash.flash_color.r * intensity,
-            flash_color.g + flash.flash_color.g * intensity,
-            flash_color.b + flash.flash_color.b * intensity,
+            flash_srgba.red + flash_flash_srgba.red * intensity,
+            flash_srgba.green + flash_flash_srgba.green * intensity,
+            flash_srgba.blue + flash_flash_srgba.blue * intensity,
         );
     }
     

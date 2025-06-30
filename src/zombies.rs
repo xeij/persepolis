@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use rand::Rng;
-use crate::{GameConfig, Player, particles::spawn_death_effect, GameState, physics::*};
+use crate::{GameConfig, Player, GameState, physics::*};
 
 pub struct ZombiePlugin;
 
@@ -294,7 +294,7 @@ fn zombie_movement(
 ) {
     if let Ok(player_transform) = player_query.get_single() {
         for (zombie_transform, mut rigidbody, zombie, ground_detector) in zombie_query.iter_mut() {
-            let direction = (player_transform.translation - zombie_transform.translation);
+            let direction = player_transform.translation - zombie_transform.translation;
             let distance = direction.length();
             
             if distance > zombie.attack_range && distance > 0.0 {

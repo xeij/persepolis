@@ -67,7 +67,7 @@ impl Default for SteamConfig {
     }
 }
 
-fn setup_game_state(mut commands: Commands) {
+fn setup_game_state(_commands: Commands) {
     println!("Game State System Initialized");
     println!("Controls:");
     println!("- WASD: Move");

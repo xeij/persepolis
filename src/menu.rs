@@ -471,7 +471,8 @@ fn main_menu_system(
             match menu_button.action {
                 ButtonAction::StartGame => next_state.set(GameState::InGame),
                 ButtonAction::Settings => next_state.set(GameState::Settings),
-                ButtonAction::Quit => exit.send(AppExit::Success),
+                ButtonAction::Quit => { exit.send(AppExit::Success); },
+                _ => {}
             }
         }
     }
@@ -509,7 +510,7 @@ fn game_over_menu_system(
             match menu_button.action {
                 ButtonAction::RestartGame => next_state.set(GameState::InGame),
                 ButtonAction::MainMenu => next_state.set(GameState::MainMenu),
-                ButtonAction::Quit => exit.send(AppExit::Success),
+                ButtonAction::Quit => { exit.send(AppExit::Success); },
                 _ => {}
             }
         }
@@ -604,11 +605,11 @@ fn update_menu_effects(
         let pulse = (effect.phase.sin() + 1.0) * 0.5;
         
         if let Some(section) = text.sections.get_mut(0) {
-            let base_color = section.style.color;
+            let base_srgba = section.style.color.to_srgba();
             section.style.color = Color::srgb(
-                base_color.r * (0.5 + pulse * 0.5),
-                base_color.g * (0.5 + pulse * 0.5),
-                base_color.b * (0.5 + pulse * 0.5),
+                base_srgba.red * (0.5 + pulse * 0.5),
+                base_srgba.green * (0.5 + pulse * 0.5),
+                base_srgba.blue * (0.5 + pulse * 0.5),
             );
         }
     }

@@ -89,7 +89,7 @@ fn player_movement(
     config: Res<GameConfig>,
     time: Res<Time>,
 ) {
-    if let (Ok((player_transform, mut rigidbody, mut player, ground_detector)), Ok(camera_transform)) = 
+    if let (Ok((_player_transform, mut rigidbody, _player, ground_detector)), Ok(camera_transform)) = 
         (player_query.get_single_mut(), camera_query.get_single()) 
     {
         let mut direction = Vec3::ZERO;
