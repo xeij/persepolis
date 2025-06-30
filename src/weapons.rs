@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::{GameCamera, Player, Zombie};
+use crate::{GameCamera, Player, Zombie, particles::spawn_death_effect};
 
 pub struct WeaponsPlugin;
 
@@ -90,6 +90,8 @@ fn move_bullets(
 
 fn bullet_collision(
     mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     bullet_query: Query<(Entity, &Transform), (With<Bullet>, Without<Zombie>)>,
     mut zombie_query: Query<(Entity, &Transform, &mut Zombie), Without<Bullet>>,
     mut player_query: Query<&mut Player>,
@@ -112,8 +114,14 @@ fn bullet_collision(
                         player.kill_count += 1;
                         player.score += 50.0;
                         
-                        // Spawn death effect
-                        spawn_death_effect(&mut commands, zombie_transform.translation);
+                        // Spawn comprehensive death effect with particle system
+                        spawn_death_effect(
+                            &mut commands,
+                            &mut meshes,
+                            &mut materials,
+                            zombie_transform.translation,
+                            &zombie.zombie_type,
+                        );
                     }
                     
                     // Remove bullet
@@ -160,12 +168,4 @@ fn update_bullet_effects(
     }
 }
 
-fn spawn_death_effect(_commands: &mut Commands, position: Vec3) {
-    // TODO: Implement psychedelic death particle effects
-    // This could include:
-    // - Particle systems with rainbow colors
-    // - Expanding rings of light
-    // - Screen flash effects
-    // - Sound effects
-    println!("Death effect at position: {:?}", position);
-} 
+ 

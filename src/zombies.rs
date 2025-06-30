@@ -1,12 +1,12 @@
 use bevy::prelude::*;
 use rand::Rng;
-use crate::{GameConfig, Player};
+use crate::{GameConfig, Player, particles::spawn_death_effect, GameState, physics::*};
 
 pub struct ZombiePlugin;
 
 impl Plugin for ZombiePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_zombie_system)
+        app.add_systems(OnEnter(GameState::InGame), setup_zombie_system)
             .add_systems(
                 Update,
                 (
@@ -16,8 +16,9 @@ impl Plugin for ZombiePlugin {
                     zombie_attack,
                     cleanup_dead_zombies,
                     update_zombie_effects,
-                ),
-            );
+                ).run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(OnExit(GameState::InGame), cleanup_all_zombies);
     }
 }
 
@@ -177,6 +178,86 @@ fn spawn_zombies(
             },
         };
         
+        // Add physics components based on zombie type
+        let (rigidbody, collider, collision_damage) = match zombie.zombie_type {
+            ZombieType::Basic => (
+                RigidBody {
+                    velocity: Vec3::ZERO,
+                    mass: 80.0,
+                    friction: 0.7,
+                    restitution: 0.1,
+                    drag: 0.85,
+                    is_kinematic: false,
+                },
+                Collider {
+                    radius: 0.6,
+                    collision_layer: CollisionLayer::Zombie,
+                    collision_mask: CollisionLayer::Player.mask() | CollisionLayer::Zombie.mask() | CollisionLayer::Environment.mask(),
+                },
+                CollisionDamage {
+                    damage: 10.0,
+                    last_damage_time: 0.0,
+                }
+            ),
+            ZombieType::Fast => (
+                RigidBody {
+                    velocity: Vec3::ZERO,
+                    mass: 60.0,
+                    friction: 0.6,
+                    restitution: 0.2,
+                    drag: 0.9,
+                    is_kinematic: false,
+                },
+                Collider {
+                    radius: 0.5,
+                    collision_layer: CollisionLayer::Zombie,
+                    collision_mask: CollisionLayer::Player.mask() | CollisionLayer::Zombie.mask() | CollisionLayer::Environment.mask(),
+                },
+                CollisionDamage {
+                    damage: 5.0,
+                    last_damage_time: 0.0,
+                }
+            ),
+            ZombieType::Heavy => (
+                RigidBody {
+                    velocity: Vec3::ZERO,
+                    mass: 120.0,
+                    friction: 0.8,
+                    restitution: 0.05,
+                    drag: 0.8,
+                    is_kinematic: false,
+                },
+                Collider {
+                    radius: 0.8,
+                    collision_layer: CollisionLayer::Zombie,
+                    collision_mask: CollisionLayer::Player.mask() | CollisionLayer::Zombie.mask() | CollisionLayer::Environment.mask(),
+                },
+                CollisionDamage {
+                    damage: 20.0,
+                    last_damage_time: 0.0,
+                }
+            ),
+            ZombieType::Exploder => (
+                RigidBody {
+                    velocity: Vec3::ZERO,
+                    mass: 50.0,
+                    friction: 0.5,
+                    restitution: 0.3,
+                    drag: 0.9,
+                    is_kinematic: false,
+                },
+                Collider {
+                    radius: 0.4,
+                    collision_layer: CollisionLayer::Zombie,
+                    collision_mask: CollisionLayer::Player.mask() | CollisionLayer::Zombie.mask() | CollisionLayer::Environment.mask(),
+                },
+                CollisionDamage {
+                    damage: 50.0,
+                    last_damage_time: 0.0,
+                }
+            ),
+        };
+
         commands.spawn((
             PbrBundle {
                 mesh,
@@ -186,6 +267,10 @@ fn spawn_zombies(
             },
             zombie,
             ZombieBody,
+            rigidbody,
+            collider,
+            collision_damage,
+            GroundDetector::default(),
         ));
     }
 }
@@ -204,16 +289,43 @@ fn zombie_ai(
 
 fn zombie_movement(
     player_query: Query<&Transform, (With<Player>, Without<Zombie>)>,
-    mut zombie_query: Query<(&mut Transform, &Zombie), Without<Player>>,
+    mut zombie_query: Query<(&Transform, &mut RigidBody, &Zombie, &GroundDetector), Without<Player>>,
     time: Res<Time>,
 ) {
     if let Ok(player_transform) = player_query.get_single() {
-        for (mut zombie_transform, zombie) in zombie_query.iter_mut() {
-            let direction = (player_transform.translation - zombie_transform.translation).normalize();
-            let distance = zombie_transform.translation.distance(player_transform.translation);
+        for (zombie_transform, mut rigidbody, zombie, ground_detector) in zombie_query.iter_mut() {
+            let direction = (player_transform.translation - zombie_transform.translation);
+            let distance = direction.length();
             
-            if distance > zombie.attack_range {
-                zombie_transform.translation += direction * zombie.speed * time.delta_seconds();
+            if distance > zombie.attack_range && distance > 0.0 {
+                // Normalize direction and flatten to horizontal plane
+                let mut move_direction = direction.normalize();
+                move_direction.y = 0.0;
+                
+                // Calculate target velocity
+                let target_velocity = move_direction * zombie.speed;
+                
+                // Apply acceleration towards target velocity
+                let acceleration = if ground_detector.is_grounded { 15.0 } else { 5.0 };
+                let velocity_change = target_velocity - Vec3::new(rigidbody.velocity.x, 0.0, rigidbody.velocity.z);
+                let acceleration_force = velocity_change * acceleration * time.delta_seconds();
+                
+                // Apply force to horizontal movement only
+                rigidbody.velocity.x += acceleration_force.x;
+                rigidbody.velocity.z += acceleration_force.z;
+                
+                // Clamp horizontal velocity to max speed
+                let horizontal_velocity = Vec3::new(rigidbody.velocity.x, 0.0, rigidbody.velocity.z);
+                if horizontal_velocity.length() > zombie.speed {
+                    let clamped = horizontal_velocity.normalize() * zombie.speed;
+                    rigidbody.velocity.x = clamped.x;
+                    rigidbody.velocity.z = clamped.z;
+                }
+            } else if ground_detector.is_grounded {
+                // Apply stopping force when in attack range
+                let stopping_force = 0.8;
+                rigidbody.velocity.x *= stopping_force;
+                rigidbody.velocity.z *= stopping_force;
             }
         }
     }
@@ -296,5 +408,11 @@ fn update_zombie_effects(
                 },
             }
         }
+    }
+}
+
+fn cleanup_all_zombies(mut commands: Commands, zombie_query: Query<Entity, With<Zombie>>) {
+    for entity in zombie_query.iter() {
+        commands.entity(entity).despawn();
     }
 } 

@@ -68,7 +68,7 @@ exit /b 0
 
 :build
 echo.
-echo Building Hyper Undead...
+echo Building Void...
 cargo build
 if %ERRORLEVEL% NEQ 0 (
     echo ⚠ Debug build failed, trying release mode...
@@ -149,5 +149,5 @@ goto :end
 
 :end
 echo.
-echo Setup complete! Thanks for playing Hyper Undead!
+echo Setup complete! Thanks for playing Void!
 pause 

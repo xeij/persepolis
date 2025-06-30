@@ -5,22 +5,22 @@ pub struct GameStatePlugin;
 
 impl Plugin for GameStatePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<GameConfig>()
+        app.init_state::<GameState>()
+            .init_resource::<GameConfig>()
             .init_resource::<GameStats>()
             .init_resource::<SteamConfig>()
             .add_systems(Startup, setup_game_state)
-            .add_systems(Update, update_game_stats);
+            .add_systems(Update, (
+                update_game_stats,
+                handle_game_over_condition,
+                update_high_score,
+            ));
     }
 }
 
-// Simple game state tracking without Bevy states for now
-#[derive(Resource, Debug, Clone, PartialEq, Eq, Default)]
-pub struct SimpleGameState {
-    pub current: GamePhase,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum GamePhase {
+// Proper Bevy states
+#[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub enum GameState {
     #[default]
     MainMenu,
     InGame,
@@ -68,24 +68,50 @@ impl Default for SteamConfig {
 }
 
 fn setup_game_state(mut commands: Commands) {
-    commands.insert_resource(SimpleGameState::default());
-    
     println!("Game State System Initialized");
     println!("Controls:");
     println!("- WASD: Move");
     println!("- Mouse: Look around");
     println!("- Left Click: Grab cursor and shoot");
-    println!("- Escape: Release cursor");
+    println!("- Escape: Pause/Menu");
     println!("- Shift: Sprint");
 }
 
 fn update_game_stats(
     mut game_stats: ResMut<GameStats>,
     time: Res<Time>,
-    game_state: Res<SimpleGameState>,
+    state: Res<State<GameState>>,
 ) {
-    if game_state.current == GamePhase::InGame {
+    if *state.get() == GameState::InGame {
         game_stats.time_played += time.delta_seconds();
+    }
+}
+
+fn handle_game_over_condition(
+    player_query: Query<&crate::Player>,
+    mut next_state: ResMut<NextState<GameState>>,
+    state: Res<State<GameState>>,
+) {
+    if *state.get() == GameState::InGame {
+        if let Ok(player) = player_query.get_single() {
+            if player.health <= 0.0 {
+                next_state.set(GameState::GameOver);
+            }
+        }
+    }
+}
+
+fn update_high_score(
+    player_query: Query<&crate::Player>,
+    mut game_stats: ResMut<GameStats>,
+    state: Res<State<GameState>>,
+) {
+    if *state.get() == GameState::GameOver {
+        if let Ok(player) = player_query.get_single() {
+            if player.score > game_stats.high_score {
+                game_stats.high_score = player.score;
+            }
+        }
     }
 }
 

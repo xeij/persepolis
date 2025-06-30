@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::input::mouse::MouseMotion;
 use bevy::window::{CursorGrabMode, PrimaryWindow};
-use crate::{GameCamera, GameConfig};
+use crate::{GameCamera, GameConfig, GameState};
 
 pub struct CameraPlugin;
 
@@ -12,10 +12,14 @@ impl Plugin for CameraPlugin {
                 Update,
                 (
                     mouse_look,
-                    handle_cursor_grab,
+                    handle_cursor_grab_ingame,
                     update_camera_effects,
-                ),
-            );
+                ).run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(OnEnter(GameState::MainMenu), release_cursor)
+            .add_systems(OnEnter(GameState::Paused), release_cursor)
+            .add_systems(OnEnter(GameState::Settings), release_cursor)
+            .add_systems(OnEnter(GameState::GameOver), release_cursor);
     }
 }
 
@@ -87,21 +91,22 @@ fn mouse_look(
     }
 }
 
-fn handle_cursor_grab(
+fn handle_cursor_grab_ingame(
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    key: Res<ButtonInput<KeyCode>>,
 ) {
     if let Ok(mut window) = windows.get_single_mut() {
         if mouse.just_pressed(MouseButton::Left) {
             window.cursor.grab_mode = CursorGrabMode::Locked;
             window.cursor.visible = false;
         }
+    }
+}
 
-        if key.just_pressed(KeyCode::Escape) {
-            window.cursor.grab_mode = CursorGrabMode::None;
-            window.cursor.visible = true;
-        }
+fn release_cursor(mut windows: Query<&mut Window, With<PrimaryWindow>>) {
+    if let Ok(mut window) = windows.get_single_mut() {
+        window.cursor.grab_mode = CursorGrabMode::None;
+        window.cursor.visible = true;
     }
 }
 

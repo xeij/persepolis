@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::{Player, GameConfig};
+use crate::{Player, GameConfig, GameState};
 
 #[cfg(feature = "dev")]
 use iyes_perf_ui::prelude::*;
@@ -8,14 +8,15 @@ pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_ui)
+        app.add_systems(OnEnter(GameState::InGame), setup_ui)
             .add_systems(Update, (
                 update_health_bar,
                 update_score_display,
                 update_kill_count_display,
                 update_crosshair,
                 update_ui_effects,
-            ));
+            ).run_if(in_state(GameState::InGame)))
+            .add_systems(OnExit(GameState::InGame), cleanup_ui);
             
         #[cfg(feature = "dev")]
         app.add_systems(Startup, setup_perf_ui);
@@ -234,5 +235,11 @@ fn update_ui_effects(
             base_color.to_srgba().green * (1.0 - intensity * 0.5) + psychedelic_color.to_srgba().green * intensity * 0.5,
             base_color.to_srgba().blue * (1.0 - intensity * 0.5) + psychedelic_color.to_srgba().blue * intensity * 0.5,
         );
+    }
+}
+
+fn cleanup_ui(mut commands: Commands, ui_query: Query<Entity, With<PsychedelicUI>>) {
+    for entity in ui_query.iter() {
+        commands.entity(entity).despawn_recursive();
     }
 } 

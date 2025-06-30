@@ -1,11 +1,11 @@
 use bevy::prelude::*;
-use crate::{GameCamera, GameConfig};
+use crate::{GameCamera, GameConfig, GameState, physics::*};
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_player)
+        app.add_systems(OnEnter(GameState::InGame), setup_player)
             .add_systems(
                 Update,
                 (
@@ -13,8 +13,10 @@ impl Plugin for PlayerPlugin {
                     handle_shooting,
                     update_player_effects,
                     sync_camera_to_player,
-                ),
-            );
+                ).run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(OnExit(GameState::InGame), cleanup_player)
+            .add_systems(OnEnter(GameState::InGame), reset_player_on_restart);
     }
 }
 
@@ -28,6 +30,8 @@ pub struct Player {
     pub psychedelic_charge: f32,
     pub kill_count: u32,
     pub score: f32,
+    pub acceleration: f32,
+    pub air_control: f32,
 }
 
 impl Default for Player {
@@ -41,6 +45,8 @@ impl Default for Player {
             psychedelic_charge: 0.0,
             kill_count: 0,
             score: 0.0,
+            acceleration: 20.0,
+            air_control: 0.3,
         }
     }
 }
@@ -49,29 +55,48 @@ impl Default for Player {
 pub struct PlayerBody;
 
 fn setup_player(mut commands: Commands) {
-    // Create an invisible player body for physics
+    // Create player with physics components
     commands.spawn((
-        TransformBundle::from(Transform::from_xyz(0.0, 0.0, 0.0)),
+        TransformBundle::from(Transform::from_xyz(0.0, 1.0, 0.0)), // Start slightly above ground
         Player::default(),
         PlayerBody,
+        RigidBody {
+            velocity: Vec3::ZERO,
+            mass: 70.0, // 70kg player
+            friction: 0.8,
+            restitution: 0.0, // No bouncing for player
+            drag: 0.95,
+            is_kinematic: false,
+        },
+        Collider {
+            radius: 0.5,
+            collision_layer: CollisionLayer::Player,
+            collision_mask: CollisionLayer::Zombie.mask() | CollisionLayer::Environment.mask(),
+        },
+        GroundDetector::default(),
+        Jumper {
+            can_jump: true,
+            jump_count: 0,
+            max_jumps: 1, // Single jump for now
+        },
     ));
 }
 
 fn player_movement(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut player_query: Query<&mut Transform, (With<Player>, Without<GameCamera>)>,
+    mut player_query: Query<(&Transform, &mut RigidBody, &mut Player, &GroundDetector), (With<Player>, Without<GameCamera>)>,
     camera_query: Query<&Transform, (With<GameCamera>, Without<Player>)>,
     config: Res<GameConfig>,
     time: Res<Time>,
 ) {
-    if let (Ok(mut player_transform), Ok(camera_transform)) = 
+    if let (Ok((player_transform, mut rigidbody, mut player, ground_detector)), Ok(camera_transform)) = 
         (player_query.get_single_mut(), camera_query.get_single()) 
     {
         let mut direction = Vec3::ZERO;
         let forward = camera_transform.forward();
         let right = camera_transform.right();
 
-        // WASD movement
+        // Get movement input
         if keyboard_input.pressed(KeyCode::KeyW) {
             direction += *forward;
         }
@@ -85,6 +110,9 @@ fn player_movement(
             direction += *right;
         }
 
+        // Flatten direction to horizontal plane
+        direction.y = 0.0;
+
         // Sprinting
         let speed_multiplier = if keyboard_input.pressed(KeyCode::ShiftLeft) {
             1.5
@@ -92,17 +120,43 @@ fn player_movement(
             1.0
         };
 
-        // Normalize and apply movement
+        // Apply physics-based movement
         if direction.length() > 0.0 {
             direction = direction.normalize();
-            player_transform.translation += direction 
-                * config.movement_speed 
-                * speed_multiplier 
-                * time.delta_seconds();
+            
+            // Calculate target velocity
+            let target_velocity = direction * config.movement_speed * speed_multiplier;
+            
+            // Apply different acceleration based on ground state
+            let acceleration = if ground_detector.is_grounded {
+                player.acceleration
+            } else {
+                player.acceleration * player.air_control // Reduced air control
+            };
+            
+            // Smoothly accelerate towards target velocity
+            let velocity_change = target_velocity - Vec3::new(rigidbody.velocity.x, 0.0, rigidbody.velocity.z);
+            let acceleration_force = velocity_change * acceleration * time.delta_seconds();
+            
+            // Apply force to horizontal movement only
+            rigidbody.velocity.x += acceleration_force.x;
+            rigidbody.velocity.z += acceleration_force.z;
+            
+            // Clamp horizontal velocity to max speed
+            let horizontal_velocity = Vec3::new(rigidbody.velocity.x, 0.0, rigidbody.velocity.z);
+            let max_speed = config.movement_speed * speed_multiplier;
+            
+            if horizontal_velocity.length() > max_speed {
+                let clamped = horizontal_velocity.normalize() * max_speed;
+                rigidbody.velocity.x = clamped.x;
+                rigidbody.velocity.z = clamped.z;
+            }
+        } else if ground_detector.is_grounded {
+            // Apply stopping force when no input
+            let stopping_force = 0.9;
+            rigidbody.velocity.x *= stopping_force;
+            rigidbody.velocity.z *= stopping_force;
         }
-
-        // Update camera to follow player
-        // We'll handle this in a separate system to avoid borrowing conflicts
     }
 }
 
@@ -166,5 +220,17 @@ pub fn sync_camera_to_player(
         camera_transform.translation.z = player_transform.translation.z;
         // Keep camera at eye height (1.8 units above player)
         camera_transform.translation.y = player_transform.translation.y + 1.8;
+    }
+}
+
+fn cleanup_player(mut commands: Commands, player_query: Query<Entity, With<Player>>) {
+    for entity in player_query.iter() {
+        commands.entity(entity).despawn();
+    }
+}
+
+fn reset_player_on_restart(mut player_query: Query<&mut Player>) {
+    for mut player in player_query.iter_mut() {
+        *player = Player::default();
     }
 } 

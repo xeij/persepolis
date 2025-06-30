@@ -14,6 +14,8 @@ mod audio;
 mod ui;
 mod physics;
 mod game_state;
+mod particles;
+mod menu;
 
 use camera::*;
 use player::*;
@@ -24,6 +26,8 @@ use audio::*;
 use ui::*;
 use physics::*;
 use game_state::*;
+use particles::*;
+use menu::*;
 
 fn main() {
     let mut app = App::new();
@@ -48,6 +52,8 @@ fn main() {
             UIPlugin,
             PhysicsPlugin,
             GameStatePlugin,
+            ParticlePlugin,
+            MenuPlugin,
             // Performance UI
             PerfUiPlugin,
         ));
